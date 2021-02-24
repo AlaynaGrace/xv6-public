@@ -1,5 +1,8 @@
+#include "pstat.h"
+
 struct stat;
 struct rtcdate;
+struct lock_t;
 
 // system calls
 int fork(void);
@@ -23,6 +26,13 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int getreadcount(void);
+int settickets(int);
+int getpinfo(struct pstat *);
+int mprotect(void *addr, int len);
+int munprotect(void *addr, int len);
+int clone(void (*fcn)(void*, void *), void *arg1, void *arg2, void *stack);
+int join(void **stack);
 
 // ulib.c
 int stat(const char*, struct stat*);
@@ -37,3 +47,8 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2);
+int thread_join();
+void lock_init(struct lock_t *);
+void lock_acquire(struct lock_t *);
+void lock_release(struct lock_t *);

@@ -16,6 +16,9 @@
 #include "file.h"
 #include "fcntl.h"
 
+static long readcnt;
+struct spinlock readcntlock;
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -73,6 +76,9 @@ sys_read(void)
   int n;
   char *p;
 
+  acquire(&readcntlock);
+  ++readcnt;
+  release(&readcntlock);
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
   return fileread(f, p, n);
@@ -441,4 +447,59 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
+}
+
+int
+sys_getreadcount(void)
+{
+  return readcnt;
+}
+
+int
+sys_mprotect(void)
+{
+  void *addr;
+  int len;
+  if (argptr(0, (char **)&addr, sizeof(void *)) < 0)
+    return -1;
+  if (argint(1, &len) < 0)
+    return -1;
+  return mprotect((uint)addr, len);
+}
+
+int
+sys_munprotect(void)
+{
+  void *addr;
+  int len;
+  if (argptr(0, (char **)&addr, sizeof(void *)) < 0)
+    return -1;
+  if (argint(1, &len) < 0)
+    return -1;
+  return munprotect((uint)addr, len);
+}
+
+int
+sys_clone(void)
+{
+  void (*fcn)(void *, void *);
+  void *arg1, *arg2, *stack;
+  if (argptr(0, (char **)&fcn, sizeof(void (*)(void *, void *)) < 0))
+    return -1;
+  if (argptr(1, (char **)&arg1, sizeof(void *)) < 0)
+    return -1;
+  if (argptr(2, (char **)&arg2, sizeof(void *)) < 0)
+    return -1;
+  if (argptr(3, (char **)&stack, sizeof(void *)) < 0)
+    return -1;
+  return clone(fcn, arg1, arg2, stack);
+}
+
+int
+sys_join(void)
+{
+  void **stack;
+  if (argptr(0, (char **)&stack, sizeof(void **)) < 0)
+    return -1;
+  return join(stack);
 }
