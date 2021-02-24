@@ -94,12 +94,12 @@ sys_uptime(void)
 int
 sys_settickets(void)
 {
-  int newtickets;
+  int newTickets;
 
-  if (argint(0, &newtickets) < 0)
+  if (argint(0, &newTickets) < 0)
     return -1;
   
-  return settickets(newtickets);
+  return settickets(newTickets);
 }
 
 int

@@ -12,7 +12,7 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  int totaltickets;
+  int totalTickets;
 } ptable;
 
 static struct proc *initproc;
@@ -27,7 +27,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
-  ptable.totaltickets = 0;
+  ptable.totalTickets = 0;
 }
 
 // Must be called with interrupts disabled
@@ -144,7 +144,7 @@ userinit(void)
   p->tf->eip = 0;  // beginning of initcode.S
   p->tickets = 10;
   acquire(&tickslock);
-  p->totalsleep = ticks;
+  p->totalSleep = ticks;
   release(&tickslock);
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
@@ -156,7 +156,7 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
-  ptable.totaltickets += p->tickets;
+  ptable.totalTickets += p->tickets;
   p->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -224,13 +224,13 @@ fork(void)
   acquire(&ptable.lock);
 
   np->tickets = curproc->tickets;
-  ptable.totaltickets += curproc->tickets;
+  ptable.totalTickets += curproc->tickets;
   np->state = RUNNABLE;
 
   release(&ptable.lock);
 
   acquire(&tickslock);
-  np->totalsleep = ticks;
+  np->totalSleep = ticks;
   release(&tickslock);
 
   return pid;
@@ -311,8 +311,8 @@ wait(void)
         p->killed = 0;
         p->state = UNUSED;
         p->tickets = 0;
-        p->totalsleep = 0;
-        p->lastsleep = 0;
+        p->totalSleep = 0;
+        p->lastSleep = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -345,25 +345,25 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
-    int lottery = rand() % ptable.totaltickets;
-    int ticketcounter = 0, allsleeping = 1;
+    int lottery = rand() % ptable.totalTickets;
+    int ticketCounter = 0, allAsleep = 1;
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      ticketcounter += p->tickets;
-      if (ticketcounter > lottery && (p->state == RUNNABLE || p->state == RUNNING)) {
-        allsleeping = 0;
+      ticketCounter += p->tickets;
+      if (ticketCounter > lottery && (p->state == RUNNABLE || p->state == RUNNING)) {
+        allAsleep = 0;
         break;
       }
       /*
        * Debug printing:
-       * cprintf("finding...ticketcounter = %d, lottery = %d, pid = %d, p->state = %d\n", ticketcounter, lottery, p->pid, p->state);    
+       * cprintf("finding...ticketCounter = %d, lottery = %d, pid = %d, p->state = %d\n", ticketCounter, lottery, p->pid, p->state);    
        */
     }
-    if (allsleeping) {
+    if (allAsleep) {
       /*
        * Debug printing:
        * cprintf("no available proc, continue");
@@ -373,7 +373,7 @@ scheduler(void)
     }
     /*
      * Debug printing:
-     * cprintf("found. total = %d, lottery = %d, pid = %d\n", ptable.totaltickets, lottery, p->pid);
+     * cprintf("found. total = %d, lottery = %d, pid = %d\n", ptable.totalTickets, lottery, p->pid);
      */
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
@@ -384,9 +384,9 @@ scheduler(void)
 
     // Calc the sleep time for proc p
     acquire(&tickslock);
-    if (p->lastsleep) {
-      p->totalsleep += ticks - (p->lastsleep);
-      p->lastsleep = 0;
+    if (p->lastSleep) {
+      p->totalSleep += ticks - (p->lastSleep);
+      p->lastSleep = 0;
     }
     release(&tickslock);
 
@@ -482,7 +482,7 @@ sleep(void *chan, struct spinlock *lk)
   }
   // Record the last sleep time
   acquire(&tickslock);
-  p->lastsleep = ticks;
+  p->lastSleep = ticks;
   release(&tickslock);
   // Go to sleep.
   p->chan = chan;
@@ -587,9 +587,9 @@ settickets(int new)
 {
   struct proc *curproc = myproc();
   acquire(&ptable.lock);
-  ptable.totaltickets -= curproc->tickets;
+  ptable.totalTickets -= curproc->tickets;
   curproc->tickets = new;
-  ptable.totaltickets += new;
+  ptable.totalTickets += new;
   release(&ptable.lock);
   return 0;
 }
@@ -613,7 +613,7 @@ getpinfo(struct pstat *ps)
     ps->pid[i] = p->pid;
     ps->tickets[i] = p->tickets;
     acquire(&tickslock);
-    ps->ticks[i] = ticks - (p->totalsleep);
+    ps->ticks[i] = ticks - (p->totalSleep);
     release(&tickslock);
     i++;
   }
