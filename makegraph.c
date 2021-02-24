@@ -1,91 +1,85 @@
 #include "types.h"
-#include "fcntl.h"
+#include "stat.h"
 #include "user.h"
 #include "pstat.h"
-#include <stdio.h>
-/*
- * This programs monitors two processes and records their numer of ticks every so and so intervals
- */
+#include "fcntl.h"
 
-// Sampling frequency
-const int SAMP_PERIOD = 75;
-// Total time sampled
-const int SAMP_WINDOW = 2000;
-
-// How many tickets the grapher has
-const int GRAPHER_PRIORITY = 1000;
-// Where we're writing to
-const char*const OUTPUT_FILE = "graph.csv";
-
-int main(int argc, char** argv){
-	settickets(GRAPHER_PRIORITY);
-	
-	// How many processes we're observing
-	const int PROCESS_QUANTITY = argc - 1;
-
-	// list of pids
-	int processes[PROCESS_QUANTITY];
-	for(int i=0;i<PROCESS_QUANTITY;i++)
-		processes[i] = atoi(argv[i+1]);
-
-	// Let's get the pstat struct
-	struct pstat pinfo = {0};
-	if(0>getpinfo(&pinfo))
-	{
-		printf("getpinfo() failed\n");
-		exit();
+void spin()
+{
+  int i = 0;
+  int j = 0;
+  int k = 0;
+  for(i = 0; i < 50; ++i)
+    {
+      for(j = 0; j < 400000; ++j)
+        {
+	  k = j % 10;
+	  k = k + 1;
 	}
+    }
+}
 
-	// Open file
-	//unlink(OUTPUT_FILE);
-	// int fp = stdout;//open(OUTPUT_FILE, O_WRONLY);
+int
+main(int argc, char *argv[]){
+  int numtickets[]={20,10,30};
+  int pid_chds[3];
 
-	// Write header
-	printf("time, ");
-	for(int i=0;i<PROCESS_QUANTITY;i++)
-	{
-		fprintf("%d, ", processes[i]);
+  pid_chds[0]=getpid();
+  settickets(numtickets[0]);
+
+  int i;
+  for(i=1;i<3;i++){
+    pid_chds[i]=fork();
+    if(pid_chds[i]==0){
+      for (;;){
+	spin();
+      }
+    }
+    else{
+      settickets(numtickets[i]);
+    }
+  }
+    
+  struct pstat st;
+  int time=0;
+  int ticks[3]={0,0,0};
+
+  printf(1,"pid:%d, pid:%d, pid:%d\n",pid_chds[0],pid_chds[1],pid_chds[2]);
+  printf(1,"tickets:%d, tickets:%d, tickets:%d\n",30,20,10);
+
+  while(time<50){
+    if(getpinfo(&st)!=0){
+      printf(1,"check failed: getpinfo\n");
+      goto Cleanup;
+    }
+    
+    int j;
+    int pid;
+    for(i=0;i<3;i++){
+      pid=pid_chds[i];
+      for(j=0;j<NPROC;j++){
+	if(st.pid[j]==pid){
+      	  ticks[i]=st.ticks[j];
+	  // printf(1,"pid:%d, tickets:%d, ticks:%d\n",pid,st.tickets[j],st.ticks[j]);
 	}
-	write(1,"\n", 1);
+      }
+    }
 
-	// List of indexes in the pstat struct
-	// that give us the processes we want
-	int pindices[PROCESS_QUANTITY];
-	for(int index=0;index<NPROC;index++)
-	{
-		for(int i=0;i<PROCESS_QUANTITY;i++)
-		{
-			if(pinfo.pid[index] == processes[i])
-			{
-				pindices[i] = index;
-			}
-		}
-	}
-	
-	int time_passed = 0;
-	while(1){
-		// Update pinfo
-		getpinfo(&pinfo);
+   
+   for(i=0;i<3;i++){
+      printf(1,"%d, ",ticks[i]);
+    }
+    printf(1,"\n");
+    
+    spin();
+    time++;
+  }
+    
+ Cleanup:
+  for (i = 0; pid_chds[i] > 0; i++){
+    kill(pid_chds[i]);
+  }
+  while(wait() > -1);
 
-		fprintf("%d, ", uptime());
-
-		// Fill ticks
-		for(int i=0; i<PROCESS_QUANTITY;i++){
-
-			fprintf("%d, ", pinfo.hticks[pindices[i]]);
-			fprintf("%d, ", pinfo.lticks[pindices[i]]);
-
-		}
-		write(1, "\n", 1);
-
-		// End if needed
-		if(time_passed>=SAMP_WINDOW)
-			break;
-		// Sleep
-		sleep(SAMP_PERIOD);
-		time_passed+=SAMP_PERIOD;
-	}
-
-	close(0);
-	exit();
+  exit();
 }
