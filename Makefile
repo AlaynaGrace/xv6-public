@@ -11,6 +11,7 @@ OBJS = \
 	lapic.o\
 	log.o\
 	main.o\
+	makegraph.o\
 	mp.o\
 	picirq.o\
 	pipe.o\
