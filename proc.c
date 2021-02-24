@@ -358,31 +358,16 @@ scheduler(void)
         allAsleep = 0;
         break;
       }
-      /*
-       * Debug printing:
-       * cprintf("finding...ticketCounter = %d, lottery = %d, pid = %d, p->state = %d\n", ticketCounter, lottery, p->pid, p->state);    
-       */
     }
     if (allAsleep) {
-      /*
-       * Debug printing:
-       * cprintf("no available proc, continue");
-       */
       release(&ptable.lock);
       continue;
     }
-    /*
-     * Debug printing:
-     * cprintf("found. total = %d, lottery = %d, pid = %d\n", ptable.totalTickets, lottery, p->pid);
-     */
-    // Switch to chosen process.  It is the process's job
-    // to release ptable.lock and then reacquire it
-    // before jumping back to us.
+
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
 
-    // Calc the sleep time for proc p
     acquire(&tickslock);
     if (p->lastSleep) {
       p->totalSleep += ticks - (p->lastSleep);
@@ -393,8 +378,6 @@ scheduler(void)
     swtch(&(c->scheduler), p->context);
     switchkvm();
 
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
     c->proc = 0;
     release(&ptable.lock);
   }
@@ -480,7 +463,7 @@ sleep(void *chan, struct spinlock *lk)
     acquire(&ptable.lock);  //DOC: sleeplock1
     release(lk);
   }
-  // Record the last sleep time
+  
   acquire(&tickslock);
   p->lastSleep = ticks;
   release(&tickslock);
