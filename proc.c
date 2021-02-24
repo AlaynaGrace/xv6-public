@@ -601,7 +601,7 @@ getpinfo(struct pstat *ps)
     ps->tickets[i] = p->tickets;
 
     acquire(&tickslock);
-    if(ps->hticks < 2)
+    if(&ps.hticks < 2)
       ps->hticks[i] = ticks - (p->totalSleep);
     ps->lticks[i] = ticks - (p->totalSleep);
     release(&tickslock);
