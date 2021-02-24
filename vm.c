@@ -310,32 +310,6 @@ clearpteu(pde_t *pgdir, char *uva)
   *pte &= ~PTE_U;
 }
 
-// Clear PTE_W on a page. 
-// Used to create an read-only page
-void
-clearptew(pde_t *pgdir, char *uva)
-{
-  pte_t *pte;
-
-  pte = walkpgdir(pgdir, uva, 0);
-  if(pte == 0)
-    return;
-  *pte &= ~PTE_W;
-}
-
-// Set PTE_W on a page. 
-// Used to create an read-write page
-void
-setptew(pde_t *pgdir, char *uva)
-{
-  pte_t *pte;
-
-  pte = walkpgdir(pgdir, uva, 0);
-  if(pte == 0)
-    return;
-  *pte |= PTE_W;
-}
-
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
@@ -407,28 +381,6 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     len -= n;
     buf += n;
     va = va0 + PGSIZE;
-  }
-  return 0;
-}
-
-int mprotect(uint addr, int len)
-{
-  struct proc *curproc = myproc();
-  addr = PGROUNDDOWN(addr);
-  for (int i = 0; i < len; ++i){
-    clearptew(curproc->pgdir, (char *)addr);
-    addr += PGSIZE;
-  }
-  return 0;
-}
-
-int munprotect(uint addr, int len)
-{
-  struct proc *curproc = myproc();
-  addr = PGROUNDDOWN(addr);
-  for (int i = 0; i < len; ++i){
-    setptew(curproc->pgdir, (char *)addr);
-    addr += PGSIZE;
   }
   return 0;
 }

@@ -123,8 +123,6 @@ void            wakeup(void*);
 void            yield(void);
 int             getpinfo(struct pstat *);
 int             settickets(int);
-int             clone(void (*fcn)(void *, void *), void *arg1, void *agr2, void *stack);
-int             join(void **stack);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -190,7 +188,6 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
-void            clearptew(pde_t *pgdir, char *uva);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

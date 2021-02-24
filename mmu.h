@@ -178,7 +178,4 @@ struct gatedesc {
   (gate).off_31_16 = (uint)(off) >> 16;                  \
 }
 
-int mprotect(uint addr, int len);
-int munprotect(uint addr, int len);
-
 #endif

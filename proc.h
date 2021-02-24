@@ -54,11 +54,6 @@ struct proc {
   int tickets;                 // Tickets for lottery scheduler
   int totalsleep;              // Total sleep ticks
   int lastsleep;               // Last tick for sleep
-  // tref of a proc will be positive, a thread will be -1
-  int thref;                   // Reference count of the address space
-  // trefptr of a thread will be valid, a proc will be 0
-  int *threfptr;               // Reference count of the address space
-  void *thstkend;                // End of the stack, used in join(), 0 for proc 
 };
 
 #define FAKE_RETURN_PC 0xFFFFFFFF
