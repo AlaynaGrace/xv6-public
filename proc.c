@@ -463,7 +463,7 @@ sleep(void *chan, struct spinlock *lk)
     acquire(&ptable.lock);  //DOC: sleeplock1
     release(lk);
   }
-  
+
   acquire(&tickslock);
   p->lastSleep = ticks;
   release(&tickslock);
@@ -566,14 +566,19 @@ procdump(void)
 }
 
 int 
-settickets(int new)
+settickets(int num)
 {
   struct proc *curproc = myproc();
+
+  if(num < 1)
+    return -1;
+
   acquire(&ptable.lock);
   ptable.totalTickets -= curproc->tickets;
-  curproc->tickets = new;
-  ptable.totalTickets += new;
+  curproc->tickets = num;
+  ptable.totalTickets += num;
   release(&ptable.lock);
+
   return 0;
 }
 
@@ -582,22 +587,25 @@ getpinfo(struct pstat *ps)
 {
   int i;
   struct proc *p;
-  for (i = 0; i < NPROC; ++i)
-  {
+  for (i = 0; i < NPROC; ++i){
     ps->inuse[i] = 0;
   }
   i = 0;
 
-  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-  {
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if (p->state == UNUSED)
       continue;
+
     ps->inuse[i] = 1;
     ps->pid[i] = p->pid;
     ps->tickets[i] = p->tickets;
+
     acquire(&tickslock);
-    ps->ticks[i] = ticks - (p->totalSleep);
+    if(ps->hticks < 2)
+      ps->hticks[i] = ticks - (p->totalSleep);
+    ps->lticks[i] = ticks - (p->totalSleep);
     release(&tickslock);
+
     i++;
   }
 
