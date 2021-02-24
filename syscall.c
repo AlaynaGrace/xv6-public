@@ -108,10 +108,6 @@ extern int sys_uptime(void);
 extern int sys_getreadcount(void);
 extern int sys_settickets(void);
 extern int sys_getpinfo(void);
-extern int sys_mprotect(void);
-extern int sys_munprotect(void);
-extern int sys_clone(void);
-extern int sys_join(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
