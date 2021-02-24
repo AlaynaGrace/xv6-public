@@ -2,6 +2,7 @@
 #include "fcntl.h"
 #include "user.h"
 #include "pstat.h"
+#include <stdio.h>
 /*
  * This programs monitors two processes and records their numer of ticks every so and so intervals
  */
@@ -31,7 +32,7 @@ int main(int argc, char** argv){
 	struct pstat pinfo = {0};
 	if(0>getpinfo(&pinfo))
 	{
-		fprintf("getpinfo() failed\n");
+		fprintf(1,"getpinfo() failed\n");
 		exit();
 	}
 
@@ -40,7 +41,7 @@ int main(int argc, char** argv){
 	// int fp = stdout;//open(OUTPUT_FILE, O_WRONLY);
 
 	// Write header
-	fprintf("time, ");
+	fprintf(1,"time, ");
 	for(int i=0;i<PROCESS_QUANTITY;i++)
 	{
 		fprintf("%d, ", processes[i]);
