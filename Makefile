@@ -139,7 +139,7 @@ depend: $(DEPS)
 dist: clean
 	mkdir -p dist/xv6
 	git describe --long > version
-	cp -r version include kernel tools user FILES Makefile \
+	cp -r version include FILES Makefile \
 		README .gitignore dist/xv6/
 	cd dist && tar -czf xv6.tar.gz xv6
 	mv dist/xv6.tar.gz .
@@ -168,13 +168,13 @@ fs/README: README | fs
 	cp $< $@
 
 USER_BINS := $(notdir $(USER_PROGS))
-fs.img: tools/mkfs fs/README $(addprefix fs/,$(USER_BINS))
-	./tools/mkfs fs.img fs
+fs.img: mkfs fs/README $(addprefix fs/,$(USER_BINS))
+	./mkfs fs.img fs
 
-.gdbinit: tools/dot-gdbinit
+.gdbinit: dot-gdbinit
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
-.bochsrc: tools/dot-bochsrc
+.bochsrc: dot-bochsrc
 	cp dot-bochsrc .bochsrc
 
 .DEFAULT:
