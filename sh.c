@@ -144,6 +144,7 @@ getcmd(char *buf, int nbuf)
 int
 main(void)
 {
+  settickets(100);
   static char buf[100];
   int fd;
 

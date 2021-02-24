@@ -532,3 +532,32 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+int total_tickets;
+// This function should always  be in a lock
+void setproctickets(struct proc* pp, int n)
+{
+	total_tickets -= pp->tickets;
+	pp->tickets = n;
+	total_tickets += pp->tickets;
+}
+
+// Just after sleeping
+void storetickets(struct proc* pp)
+{
+	if(pp->state != SLEEPING)
+		panic("Not sleeping at storetickets");
+#ifdef STORE_TICKETS_ON_SLEEP
+	total_tickets -= pp->tickets;
+#endif
+}
+
+// Just before waking
+void restoretickets(struct proc* pp)
+{
+	if(pp->state != SLEEPING)
+		panic("Not sleeping at waketickets");
+#ifdef STORE_TICKETS_ON_SLEEP
+	total_tickets += pp->tickets;
+#endif
+}

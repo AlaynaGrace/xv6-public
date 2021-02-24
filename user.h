@@ -1,6 +1,8 @@
 struct stat;
 struct rtcdate;
 
+#include "pstat.h"
+
 // system calls
 int fork(void);
 int exit(void) __attribute__((noreturn));
@@ -23,6 +25,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int getpinfo(struct pstat*);
+int settickets(int);
 
 // ulib.c
 int stat(const char*, struct stat*);
