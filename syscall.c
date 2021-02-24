@@ -21,6 +21,12 @@ fetchint(uint addr, int *ip)
 
   if(addr >= curproc->sz || addr+4 > curproc->sz)
     return -1;
+  // Address of a proc's virtual memory
+  // starts from PGSIZE
+  // EXCEPT initcode.S
+  if (addr < PGSIZE && curproc->pid != INIT_PID) {
+    return -1;
+  }
   *ip = *(int*)(addr);
   return 0;
 }
@@ -34,7 +40,12 @@ fetchstr(uint addr, char **pp)
   char *s, *ep;
   struct proc *curproc = myproc();
 
+  // Address of a proc's virtual memory
+  // starts from PGSIZE
+  // EXCEPT initcode.S
   if(addr >= curproc->sz)
+    return -1;
+  if (addr < PGSIZE && curproc->pid != INIT_PID)
     return -1;
   *pp = (char*)addr;
   ep = (char*)curproc->sz;
@@ -103,6 +114,13 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_getreadcount(void);
+extern int sys_settickets(void);
+extern int sys_getpinfo(void);
+extern int sys_mprotect(void);
+extern int sys_munprotect(void);
+extern int sys_clone(void);
+extern int sys_join(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +144,13 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_getreadcount]   sys_getreadcount,
+[SYS_settickets]   sys_settickets,
+[SYS_getpinfo]   sys_getpinfo,
+[SYS_mprotect]   sys_mprotect,
+[SYS_munprotect]   sys_munprotect,
+[SYS_clone]   sys_clone,
+[SYS_join]   sys_join
 };
 
 void

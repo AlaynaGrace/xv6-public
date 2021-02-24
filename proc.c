@@ -6,10 +6,13 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
+#include "krand.h"
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  int totaltickets;
 } ptable;
 
 static struct proc *initproc;
@@ -24,6 +27,7 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  ptable.totaltickets = 0;
 }
 
 // Must be called with interrupts disabled
@@ -138,6 +142,10 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->tickets = 10;
+  acquire(&tickslock);
+  p->totalsleep = ticks;
+  release(&tickslock);
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -148,6 +156,7 @@ userinit(void)
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
 
+  ptable.totaltickets += p->tickets;
   p->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -200,6 +209,10 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  // Update thref, threfptr, thstkend
+  np->thref = 1;
+  np->threfptr = (void *)0;
+  np->thstkend = 0;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -214,9 +227,15 @@ fork(void)
 
   acquire(&ptable.lock);
 
+  np->tickets = curproc->tickets;
+  ptable.totaltickets += curproc->tickets;
   np->state = RUNNABLE;
 
   release(&ptable.lock);
+
+  acquire(&tickslock);
+  np->totalsleep = ticks;
+  release(&tickslock);
 
   return pid;
 }
@@ -242,6 +261,12 @@ exit(void)
     }
   }
 
+  // Decrement *threfptr for threads, or thref for process
+  if (curproc->thref == -1)
+    --*curproc->threfptr;
+  else
+    --curproc->thref;
+
   begin_op();
   iput(curproc->cwd);
   end_op();
@@ -249,7 +274,7 @@ exit(void)
 
   acquire(&ptable.lock);
 
-  // Parent might be sleeping in wait().
+  // Parent might be sleeping in join().
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
@@ -281,7 +306,7 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      if(p->thref == -1 ||  p->parent != curproc)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -295,6 +320,9 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        p->tickets = 0;
+        p->totalsleep = 0;
+        p->lastsleep = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -327,31 +355,58 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
+    int lottery = rand() % ptable.totaltickets;
+    int ticketcounter = 0, allsleeping = 1;
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      ticketcounter += p->tickets;
+      if (ticketcounter > lottery && (p->state == RUNNABLE || p->state == RUNNING)) {
+        allsleeping = 0;
+        break;
+      }
+      /*
+       * Debug printing:
+       * cprintf("finding...ticketcounter = %d, lottery = %d, pid = %d, p->state = %d\n", ticketcounter, lottery, p->pid, p->state);    
+       */
     }
-    release(&ptable.lock);
+    if (allsleeping) {
+      /*
+       * Debug printing:
+       * cprintf("no available proc, continue");
+       */
+      release(&ptable.lock);
+      continue;
+    }
+    /*
+     * Debug printing:
+     * cprintf("found. total = %d, lottery = %d, pid = %d\n", ptable.totaltickets, lottery, p->pid);
+     */
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
 
+    // Calc the sleep time for proc p
+    acquire(&tickslock);
+    if (p->lastsleep) {
+      p->totalsleep += ticks - (p->lastsleep);
+      p->lastsleep = 0;
+    }
+    release(&tickslock);
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 
@@ -435,6 +490,10 @@ sleep(void *chan, struct spinlock *lk)
     acquire(&ptable.lock);  //DOC: sleeplock1
     release(lk);
   }
+  // Record the last sleep time
+  acquire(&tickslock);
+  p->lastsleep = ticks;
+  release(&tickslock);
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
@@ -530,5 +589,158 @@ procdump(void)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
+  }
+}
+
+int 
+settickets(int new)
+{
+  struct proc *curproc = myproc();
+  acquire(&ptable.lock);
+  ptable.totaltickets -= curproc->tickets;
+  curproc->tickets = new;
+  ptable.totaltickets += new;
+  release(&ptable.lock);
+  return 0;
+}
+
+int 
+getpinfo(struct pstat *ps)
+{
+  int i;
+  struct proc *p;
+  for (i = 0; i < NPROC; ++i)
+  {
+    ps->inuse[i] = 0;
+  }
+  i = 0;
+
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->state == UNUSED)
+      continue;
+    ps->inuse[i] = 1;
+    ps->pid[i] = p->pid;
+    ps->tickets[i] = p->tickets;
+    acquire(&tickslock);
+    ps->ticks[i] = ticks - (p->totalsleep);
+    release(&tickslock);
+    i++;
+  }
+
+  return 0;
+}
+
+// Create a new process using the same address space.
+// Sets up stack to return as if from call fcn.
+// Caller must set state of returned proc to RUNNABLE.
+int
+clone(void (*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // Share the address space and page table
+  np->pgdir = curproc->pgdir;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+
+  // Update thref, threfptr, thstkend
+  np->thref = -1;
+  if (curproc->thref > 0)
+    np->threfptr = &curproc->thref;
+  else
+    np->threfptr = curproc->threfptr;
+  ++*np->threfptr;
+  np->thstkend = stack;
+
+  // Set PC to func
+  np->tf->eip = (uint)fcn;
+  // Push the args to the stack
+  uint *uintsdk = (uint *)((uint)stack + PGSIZE - 4);
+  *uintsdk-- = (uint)arg2;
+  *uintsdk-- = (uint)arg1;
+  *uintsdk = FAKE_RETURN_PC;
+  np->tf->oesp = (uint)uintsdk;
+  np->tf->esp = (uint)uintsdk;
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  // Duplicate the open files
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  // Set proc name, stare, tickets, totalsleepticks
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  acquire(&ptable.lock);
+
+  np->tickets = curproc->tickets;
+  ptable.totaltickets += curproc->tickets;
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  acquire(&tickslock);
+  np->totalsleep = ticks;
+  release(&tickslock);
+
+  return pid;
+}
+
+int
+join (void **stack)
+{
+  struct proc *p;
+  int havethreads, pid;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for (;;){
+    // Scan through table looking for exited thread.
+    havethreads = 0;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->thref != -1 || p->parent != curproc)
+        continue;
+      havethreads = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        pid = p->pid;
+        p->kstack = 0;
+        p->pgdir = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        p->tickets = 0;
+        p->totalsleep = 0;
+        p->lastsleep = 0;
+        p->threfptr = 0;
+        *stack = p->thstkend;
+        release(&ptable.lock);
+        return pid;
+      } 
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havethreads || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }

@@ -13,6 +13,8 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
+#define INIT_PID 1
+
 //PAGEBREAK: 17
 // Saved registers for kernel context switches.
 // Don't need to save all the segment registers (%cs, etc),
@@ -49,7 +51,17 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int tickets;                 // Tickets for lottery scheduler
+  int totalsleep;              // Total sleep ticks
+  int lastsleep;               // Last tick for sleep
+  // tref of a proc will be positive, a thread will be -1
+  int thref;                   // Reference count of the address space
+  // trefptr of a thread will be valid, a proc will be 0
+  int *threfptr;               // Reference count of the address space
+  void *thstkend;                // End of the stack, used in join(), 0 for proc 
 };
+
+#define FAKE_RETURN_PC 0xFFFFFFFF
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

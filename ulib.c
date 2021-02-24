@@ -3,6 +3,7 @@
 #include "fcntl.h"
 #include "user.h"
 #include "x86.h"
+#include "ticketlock.h"
 
 char*
 strcpy(char *s, const char *t)
@@ -103,4 +104,51 @@ memmove(void *vdst, const void *vsrc, int n)
   while(n-- > 0)
     *dst++ = *src++;
   return vdst;
+}
+
+int
+thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
+{
+    void *userstk = malloc(PGSIZE);
+    return clone(start_routine, arg1, arg2, userstk);
+}
+
+int
+thread_join()
+{
+    void *stack = 0;
+    if (join(&stack) < 0)
+        return -1;
+    free(stack);
+    return 0;
+}
+
+// inplement a ticket lock via exchange-and-add
+void lock_init(lock_t *lk)
+{
+  lk->ticket = 0;
+  lk->turn = 0;
+}
+
+void lock_acquire(lock_t *lk)
+{
+  uint myturn = xaddl(&lk->ticket);
+  // load lk->turn MUST be atomic
+  // cmpxchg can be replaced by a atomic load instr
+  uint lkturn = cmpxchg(&lk->turn, myturn, myturn);
+  while (lkturn != myturn)
+    lkturn = cmpxchg(&lk->turn, myturn, myturn); // spin
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that the critical section's memory
+  // references happen after the lock is acquired.
+  __sync_synchronize();
+}
+
+void lock_release(lock_t *lk)
+{
+  xaddl(&lk->turn);
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that the critical section's memory
+  // references happen after the lock is acquired.
+  __sync_synchronize();
 }
