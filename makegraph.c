@@ -42,7 +42,8 @@ main(int argc, char *argv[]){
     
   struct pstat st;
   int time=0;
-  int ticks[3]={0,0,0};
+  int hticks[3]={0,0,0};
+  int lticks[3]={0,0,0};
 
   printf(1,"pid:%d, pid:%d, pid:%d\n",pid_chds[0],pid_chds[1],pid_chds[2]);
   printf(1,"tickets:%d, tickets:%d, tickets:%d\n",30,20,10);
@@ -59,8 +60,8 @@ main(int argc, char *argv[]){
       pid=pid_chds[i];
       for(j=0;j<NPROC;j++){
 	if(st.pid[j]==pid){
-      	ticks[i]=st.hticks[j];
-        // ticks[i]=st.lticks[j];
+      	hticks[i]=st.hticks[j];
+        lticks[i]=st.lticks[j];
 	  // printf(1,"pid:%d, tickets:%d, ticks:%d\n",pid,st.tickets[j],st.ticks[j]);
 	}
       }
@@ -68,7 +69,9 @@ main(int argc, char *argv[]){
 
    
    for(i=0;i<3;i++){
-      printf(1,"%d, ",ticks[i]);
+      printf(1,"High: %d, ",hticks[i]);
+      printf(1,"Low: %d, ",lticks[i]);
+
     }
     printf(1,"\n");
     
