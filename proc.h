@@ -13,8 +13,6 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
-#define INIT_PID 1
-
 //PAGEBREAK: 17
 // Saved registers for kernel context switches.
 // Don't need to save all the segment registers (%cs, etc),
@@ -55,8 +53,6 @@ struct proc {
   int totalsleep;              // Total sleep ticks
   int lastsleep;               // Last tick for sleep
 };
-
-#define FAKE_RETURN_PC 0xFFFFFFFF
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
