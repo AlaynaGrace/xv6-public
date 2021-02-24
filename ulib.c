@@ -4,8 +4,15 @@
 #include "user.h"
 #include "x86.h"
 
+char
+getchar()
+{
+	char c;
+    int cc = read(stdin, &c, 1);
+	return cc==-1?-1:c;
+}
 char*
-strcpy(char *s, const char *t)
+strcpy(char *s, char *t)
 {
   char *os;
 
@@ -68,7 +75,7 @@ gets(char *buf, int max)
 }
 
 int
-stat(const char *n, struct stat *st)
+stat(char *n, struct stat *st)
 {
   int fd;
   int r;
@@ -93,14 +100,18 @@ atoi(const char *s)
 }
 
 void*
-memmove(void *vdst, const void *vsrc, int n)
+memmove(void *vdst, void *vsrc, int n)
 {
-  char *dst;
-  const char *src;
-
+  char *dst, *src;
+  
   dst = vdst;
   src = vsrc;
   while(n-- > 0)
     *dst++ = *src++;
   return vdst;
 }
+
+// Constants
+const int stdin = 0;
+const int stdout = 1;
+const int stderr = 2;

@@ -1,5 +1,8 @@
+#ifndef _USER_H_
+#define _USER_H_
+#include "pstat.h"
+
 struct stat;
-struct rtcdate;
 
 // system calls
 int fork(void);
@@ -12,28 +15,41 @@ int close(int);
 int kill(int);
 int exec(char*, char**);
 int open(const char*, int);
-int mknod(const char*, short, short);
+int mknod(char*, short, short);
 int unlink(const char*);
 int fstat(int fd, struct stat*);
-int link(const char*, const char*);
-int mkdir(const char*);
-int chdir(const char*);
+int link(char*, char*);
+int mkdir(char*);
+int chdir(char*);
 int dup(int);
 int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int getpinfo(struct pstat*);
+int settickets(int);
 
-// ulib.c
-int stat(const char*, struct stat*);
-char* strcpy(char*, const char*);
-void *memmove(void*, const void*, int);
+// user library functions (ulib.c)
+int stat(char*, struct stat*);
+char* strcpy(char*, char*);
+void *memmove(void*, void*, int);
 char* strchr(const char*, char c);
 int strcmp(const char*, const char*);
-void printf(int, const char*, ...);
+void fprintf(int, const char*, ...);
+void putchar(char c);
+char getchar(void);
 char* gets(char*, int max);
 uint strlen(const char*);
 void* memset(void*, int, uint);
 void* malloc(uint);
+void* calloc(uint, uint);
 void free(void*);
 int atoi(const char*);
+
+// Constants
+extern const int stdin;
+extern const int stdout;
+extern const int stderr;
+
+#endif // _USER_H_
+
