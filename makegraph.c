@@ -59,7 +59,8 @@ main(int argc, char *argv[]){
       pid=pid_chds[i];
       for(j=0;j<NPROC;j++){
 	if(st.pid[j]==pid){
-      	  ticks[i]=st.ticks[j];
+      	ticks[i]=st.hticks[j];
+        // ticks[i]=st.lticks[j];
 	  // printf(1,"pid:%d, tickets:%d, ticks:%d\n",pid,st.tickets[j],st.ticks[j]);
 	}
       }
